@@ -1,6 +1,11 @@
 import random
 import streamlit as st
 
+# FIX: Import the refactored check_guess from logic_utils instead of defining it
+# here. I asked the AI (agent mode) to extract the duplicated logic into a shared
+# module so the app and tests use one source of truth.
+from logic_utils import check_guess
+
 def get_range_for_difficulty(difficulty: str):
     if difficulty == "Easy":
         return 1, 20
@@ -29,24 +34,6 @@ def parse_guess(raw: str):
     return True, value, None
 
 
-def check_guess(guess, secret):
-    if guess == secret:
-        return "Win", "🎉 Correct!"
-
-    try:
-        if guess > secret:
-            return "Too High", "📈 Go HIGHER!"
-        else:
-            return "Too Low", "📉 Go LOWER!"
-    except TypeError:
-        g = str(guess)
-        if g == secret:
-            return "Win", "🎉 Correct!"
-        if g > secret:
-            return "Too High", "📈 Go HIGHER!"
-        return "Too Low", "📉 Go LOWER!"
-
-
 def update_score(current_score: int, outcome: str, attempt_number: int):
     if outcome == "Win":
         points = 100 - 10 * (attempt_number + 1)
@@ -55,8 +42,9 @@ def update_score(current_score: int, outcome: str, attempt_number: int):
         return current_score + points
 
     if outcome == "Too High":
-        if attempt_number % 2 == 0:
-            return current_score + 5
+        # FIX: Removed the "+5 on even attempts" glitch that rewarded wrong
+        # guesses. I traced the odd scoring to this branch; the AI confirmed it
+        # and stripped the conditional so a wrong guess always deducts 5.
         return current_score - 5
 
     if outcome == "Too Low":
@@ -186,6 +174,12 @@ if submit:
                     f"The secret was {st.session_state.secret}. "
                     f"Score: {st.session_state.score}"
                 )
+
+        # FIX: Force a rerun once the game ends so the UI updates immediately
+        # instead of lagging a guess behind. The AI (agent mode) suggested
+        # st.rerun() after I noticed the end-of-game state rendered one click late.
+        if st.session_state.status != "playing":
+            st.rerun()
 
 st.divider()
 st.caption("Built by an AI that claims this code is production-ready.")
